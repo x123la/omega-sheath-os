@@ -1,0 +1,15 @@
+/target
+/tmp
+/states
+/layers/elixir/runtime/_build
+/layers/elixir/runtime/deps
+/layers/lean4/.lake
+/layers/zig/.zig-cache
+/layers/zig/zig-out
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.log
+.DS_Store

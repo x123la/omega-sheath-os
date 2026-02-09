@@ -1,0 +1,11 @@
+{
+  "catalog_version": 1,
+  "entries": [
+    {"predicate_id": 1001, "name": "lamport_monotonic", "arity": 1, "semantics_ref": "formal://ordering/lamport_monotonic"},
+    {"predicate_id": 1002, "name": "event_unique", "arity": 1, "semantics_ref": "formal://ordering/event_unique"},
+    {"predicate_id": 2001, "name": "payload_hash_match", "arity": 1, "semantics_ref": "formal://dependency/payload_hash_match"},
+    {"predicate_id": 2002, "name": "dependency_known", "arity": 2, "semantics_ref": "formal://dependency/dependency_known"},
+    {"predicate_id": 3001, "name": "overlap_agreement", "arity": 2, "semantics_ref": "formal://overlap/agreement"}
+  ],
+  "catalog_hash": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+}

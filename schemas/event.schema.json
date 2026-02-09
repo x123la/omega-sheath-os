@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "omega://schemas/event.schema.json",
+  "title": "OMEGA Event",
+  "type": "object",
+  "required": [
+    "event_id",
+    "node_id",
+    "stream_id",
+    "lamport",
+    "mono_ts_ns",
+    "event_kind",
+    "flags",
+    "deps_count",
+    "payload_len",
+    "payload_hash",
+    "deps",
+    "payload"
+  ],
+  "properties": {
+    "event_id": { "type": "integer", "minimum": 0 },
+    "node_id": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+    "stream_id": { "type": "integer", "minimum": 0, "maximum": 65535 },
+    "lamport": { "type": "integer", "minimum": 0 },
+    "mono_ts_ns": { "type": "integer", "minimum": 0 },
+    "event_kind": { "type": "integer", "minimum": 0, "maximum": 65535 },
+    "flags": { "type": "integer", "minimum": 0, "maximum": 65535 },
+    "deps_count": { "type": "integer", "minimum": 0, "maximum": 65535 },
+    "payload_len": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+    "payload_hash": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 255 }, "minItems": 32, "maxItems": 32 },
+    "deps": { "type": "array", "items": { "type": "integer", "minimum": 0 } },
+    "payload": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 255 } }
+  },
+  "additionalProperties": false
+}

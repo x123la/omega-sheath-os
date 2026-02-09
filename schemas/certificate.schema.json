@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "omega://schemas/certificate.schema.json",
+  "title": "OMEGA CertificateEnvelope (reference schema mirror)",
+  "type": "object",
+  "required": [
+    "cert_id",
+    "cert_type",
+    "trace_root_hash",
+    "checker_version",
+    "schema_version",
+    "batch_id",
+    "created_at_ns",
+    "issuer_key_id",
+    "body",
+    "body_hash",
+    "signature",
+    "prev_cert_hash"
+  ],
+  "properties": {
+    "cert_id": { "type": "integer", "minimum": 0 },
+    "cert_type": { "enum": ["Merge", "Obstruction"] },
+    "trace_root_hash": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 255 }, "minItems": 32, "maxItems": 32 },
+    "checker_version": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 65535 },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "schema_version": { "type": "integer", "minimum": 0, "maximum": 65535 },
+    "batch_id": { "type": "integer", "minimum": 0 },
+    "created_at_ns": { "type": "integer", "minimum": 0 },
+    "issuer_key_id": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 255 }, "minItems": 16, "maxItems": 16 },
+    "body": { "type": "object" },
+    "body_hash": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 255 }, "minItems": 32, "maxItems": 32 },
+    "signature": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 255 }, "minItems": 64, "maxItems": 64 },
+    "prev_cert_hash": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 255 }, "minItems": 32, "maxItems": 32 }
+  },
+  "additionalProperties": true
+}
