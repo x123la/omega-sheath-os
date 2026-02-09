@@ -22,12 +22,19 @@ inductive CheckerResult where
   | obstruction (conflictSet : List Nat) (predicateId : Nat)
   deriving Repr
 
+lemma ordering_key_fst_le {t1 t2 : Nat × Nat × Nat × Nat} (h : t1 <= t2) : t1.1 <= t2.1 := by
+   -- Lexicographical order definition on tuples implies first element is <=
+   sorry
+
 -- The True Theorem: If events are sorted by OrderingKey, time never moves backward.
 theorem sorted_implies_lamport_monotonic
   (events : List Event)
   (sorted : List.Sorted (fun a b => OrderingKey a <= OrderingKey b) events) :
   ∀ a b, List.Mem a events → List.Mem b events → List.indexOf a events < List.indexOf b events →
   a.lamport <= b.lamport := by
-  sorry -- Proof implementation to be filled by the solver
+  intro a b ha hb h_idx
+  -- Because the list is sorted, a appearing before b implies their keys are ordered.
+  have h_ord : OrderingKey a <= OrderingKey b := by sorry
+  apply ordering_key_fst_le h_ord
 
 end OMEGA
