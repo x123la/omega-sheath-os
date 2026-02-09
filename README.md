@@ -14,41 +14,53 @@ The system ensures that data survives a "Gauntlet of Truth" before being finaliz
 ```mermaid
 mindmap
   root((OMEGA Kernel))
-    Formal Layer (A)
+    Formal Layer
       Lean 4 Proofs
       Theorem: Lamport Monotonicity
       Logic: Ordering Key Invariance
-    Runtime Layer (B)
-      Elixir/OTP Actor Graph
-      Consensus: BFT Quorum (N/N)
-      Communication: Phoenix PubSub
-    Systems Layer (C)
-      Zig Binary Boundary
-      I/O: Zero-Copy mmap
-      Logic: Memory-Mapped Frames
-    Analytics Layer (D)
-      Futhark Kernels
-      Fixed-Point Arithmetic (i32)
-      Determinism: Hardware Agnostic
-    Protocol Layer (E)
-      TLA+ Temporal Logic
-      Safety: CausalOrder Invariant
-      Liveness: Progress Invariant
-    Implementation Layer (F)
-      Rust Secure Kernel
-      Hashing: SHA-256 (Rigid Binary)
-      Signing: Ed25519 (Identity)
-    Observability Layer (G)
-      OC2 Command Center
+      TLA+ Temporal Safety
+    Runtime Layer (Elixir/OTP)
+      BFT Quorum Consensus
+      Phoenix PubSub Mesh
+      Actor-Based Sequencing
+      Supervision Trees
+    Systems Layer (Zig/Rust)
+      Zero-Copy mmap I/O
+      Deterministic Reconciliation
+      Ed25519 Signing
+      SHA-256 Merkle Chain
+    Analytics Layer
+      Futhark GPU Kernels
+      Fixed-Point Determinism
+      Bit-for-Bit Identity
+    Observability Layer (OC2)
       D3.js Sheaf Visualization
       Real-Time Consensus Monitoring
+      Merkle Audit Scroll
 ```
 
 ---
 
 ## 🔄 Lifecycle of a Causal Event
 
-This sequence diagram illustrates the transition from a raw binary frame to a BFT-finalized certificate.
+### 1. Data Flow & Verification Pipeline
+This flowchart illustrates the transition from a raw binary frame to a BFT-finalized certificate.
+
+```mermaid
+flowchart TD
+    A[Raw Log Frame] -->|mmap| B(Zig Boundary)
+    B -->|Zero-Copy| C{Rust Kernel}
+    C -->|Invariant Check| D[Deterministic Sort]
+    D -->|Success| E[Elixir Runtime]
+    D -->|Failure| X[Obstruction Alert]
+    E -->|BFT Vote| F[Quorum Peers]
+    F -->|Signatures| G[Certificate Finalization]
+    G -->|Hash Link| H[(Merkle Chain)]
+    G -->|Telemetry| I[OC2 Dashboard]
+```
+
+### 2. Sequence of Consensus
+Detailed interactions between the local runtime and the distributed quorum.
 
 ```mermaid
 sequenceDiagram
@@ -76,9 +88,20 @@ sequenceDiagram
 ## 📐 Mathematical & Logical Foundations
 
 ### 1. The Canonical Ordering Key
-To ensure arrival-time independence, every event is sorted by a 224-bit key before reconciliation:
+To ensure arrival-time independence, every event is sorted by a 224-bit key before reconciliation. This ensures that any two nodes in the universe, given the same set of events, will reach the **exact same state hash**.
+
+```mermaid
+graph LR
+    subgraph Key [224-bit Canonical Ordering Key]
+        direction LR
+        L[Lamport TS - 64 bits] --- N[Node ID - 32 bits]
+        N --- S[Stream ID - 16 bits]
+        S --- E[Event ID - 112 bits]
+    end
+    style Key fill:#f9f,stroke:#333,stroke-width:2px
+```
+
 $$K = (Lamport_{64} \ll 160) | (NodeID_{32} \ll 128) | (StreamID_{16} \ll 112) | (EventID_{112})$$
-This ensures that any two nodes in the universe, given the same set of events, will reach the **exact same state hash**.
 
 ### 2. Formal Monotonicity (Lean 4)
 In `layers/lean4/Formal/OMEGA.lean`, we formally prove that for any list of events $L$, if $L$ is sorted by $K$, then for any two events $a, b \in L$ where $a$ precedes $b$, $a.lamport \le b.lamport$. This establishing the "Arrow of Time" as a mathematical constant.
@@ -99,6 +122,19 @@ Traditional I/O copies data from the disk to the kernel, then to the application
 
 ### 2. Rigid Binary Contracts
 We have eliminated JSON for internal certification. The `CertificateEnvelope` is a packed binary structure:
+
+```mermaid
+classDiagram
+    class CertificateEnvelope {
+        +u128 cert_id
+        +u8 cert_type
+        +u8[32] trace_root_hash
+        +u64 batch_id
+        +u8[32] body_hash
+        +u8[32] prev_cert_hash
+    }
+```
+
 | Field | Type | Bits |
 |---|---|---|
 | `cert_id` | u128 | 128 |
