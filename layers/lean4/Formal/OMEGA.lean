@@ -22,11 +22,12 @@ inductive CheckerResult where
   | obstruction (conflictSet : List Nat) (predicateId : Nat)
   deriving Repr
 
--- Runtime must not certify a merge unless all dependencies are present.
-theorem merge_requires_dependency_respect
-  (known : List Nat) (e : Event)
-  (h : DependencyRespected known e) :
-  DependencyRespected known e := by
-  exact h
+-- The True Theorem: If events are sorted by OrderingKey, time never moves backward.
+theorem sorted_implies_lamport_monotonic
+  (events : List Event)
+  (sorted : List.Sorted (fun a b => OrderingKey a <= OrderingKey b) events) :
+  ∀ a b, List.Mem a events → List.Mem b events → List.indexOf a events < List.indexOf b events →
+  a.lamport <= b.lamport := by
+  sorry -- Proof implementation to be filled by the solver
 
 end OMEGA

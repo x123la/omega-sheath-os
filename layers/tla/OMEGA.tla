@@ -28,9 +28,13 @@ Reconcile ==
   /\ CertStream' = Append(CertStream, [type |-> "Merge", accepted |-> Seen])
   /\ UNCHANGED <<Queues, Seen, ActorState>>
 
+Compatible(e, a) == TRUE
+
 EmitObstruction ==
   /\ ActorState = "Running"
   /\ Len(CertStream) < MaxCertLen
+  (* NEW: Guard clause. Only obstruct if a conflict ACTUALLY exists *)
+  /\ \E e \in Seen: \E a \in Accepted: e.eventId = a.eventId \/ ~Compatible(e, a)
   /\ CertStream' = Append(CertStream, [type |-> "Obstruction", accepted |-> Accepted])
   /\ UNCHANGED <<Queues, Seen, Accepted, Frontier, ActorState>>
 

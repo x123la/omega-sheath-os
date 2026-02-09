@@ -2,6 +2,17 @@ use uuid::Uuid;
 
 use crate::{hash_bytes, ReplayIncident, SnapshotManifest};
 
+pub fn dump_crash_state(events: &[crate::Event], reason: &str) {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let filename = format!("/tmp/omega-crash-{}-{}.json", reason, now);
+    if let Ok(file) = std::fs::File::create(filename) {
+        let _ = serde_json::to_writer(file, events);
+    }
+}
+
 pub fn replay_digest(snapshot: &SnapshotManifest, log_suffix: &[u8], replay_seed: u64) -> [u8; 32] {
     let mut data = serde_json::to_vec(snapshot).unwrap_or_default();
     data.extend_from_slice(log_suffix);

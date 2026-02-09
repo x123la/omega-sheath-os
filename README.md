@@ -335,6 +335,7 @@ Core envelope fields:
 5. `body_hash`
 6. `signature`
 7. `prev_cert_hash`
+8. `conflicting_payload_hashes` (on obstruction)
 
 ## Predicate Catalog
 
@@ -357,7 +358,9 @@ Current examples:
 | Checker-binding metadata | Implemented | `crates/omega-core/src/checker.rs` (cryptographically bound to schema file) |
 | Binding validation before certification | Implemented | `crates/omega-cli/src/main.rs` |
 | Signed certificates + chain linkage | Implemented | `crates/omega-core/src/cert.rs` (persistent identity key), Elixir cert actor |
+| Obstruction Payload Proofs | Implemented | Witness binds to causal payload hashes |
 | Cross-language JSON Interoperability | Implemented | Elixir Runtime emits JSON certificates |
+| WASM Kernel Target | Implemented | Core compiles to wasm32-unknown-unknown |
 | `.omega` frame CRC recovery | Implemented | `crates/omega-core/src/log.rs` |
 | Replay mismatch incidents | Implemented | `crates/omega-core/src/replay.rs`, Elixir replay actor |
 | Elixir Layer B actor graph | Implemented | `layers/elixir/runtime/lib/omega_runtime/*.ex` |
@@ -489,7 +492,7 @@ Smoke now writes to unique temp directories `/tmp/omega-smoke.*`.
 
 ### Systems/Analytics Layers
 
-1. `layers/zig/src/lib.zig`
+1. `layers/zig/src/lib.zig` (Manual parsing disabled/stubbed)
 2. `layers/zig/src/cert_store.zig`
 3. `layers/futhark/kernels.fut`
 

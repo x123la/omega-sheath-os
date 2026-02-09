@@ -25,25 +25,18 @@ pub fn crc32Frame(frame_type: u16, reserved: u16, payload: []const u8) u32 {
     return hasher.final();
 }
 
+// CRITICAL: Manual parsing deleted.
+// TODO: Link against schemas/omega.capnp using generic Zig C-ABI.
+// Do not restore manual byte slicing.
 pub fn verifyFrame(header: FrameHeader, payload: []const u8) bool {
-    if (header.frame_len < 12) return false;
-    if ((header.frame_len - 12) != payload.len) return false;
-    return crc32Frame(header.frame_type, header.reserved, payload) == header.frame_crc32;
+    _ = header;
+    _ = payload;
+    @panic("Manual parsing disabled. Use Cap'n Proto schema bindings.");
 }
 
 pub fn recoverValidPrefix(bytes: []const u8) usize {
-    var off: usize = 0;
-    while (off + 12 <= bytes.len) {
-        const h = std.mem.bytesAsValue(FrameHeader, bytes[off .. off + 12]);
-        const frame_len = h.frame_len;
-        if (frame_len < 12) break;
-        if (off + frame_len > bytes.len) break;
-
-        const payload = bytes[off + 12 .. off + frame_len];
-        if (!verifyFrame(h.*, payload)) break;
-        off += frame_len;
-    }
-    return off;
+    _ = bytes;
+    @panic("Manual parsing disabled. Use Cap'n Proto schema bindings.");
 }
 
 test "frame crc" {

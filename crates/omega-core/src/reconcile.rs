@@ -15,6 +15,8 @@ pub enum CheckerResult {
     },
     Obstruction {
         conflict_set: Vec<EventId>,
+        // NEW: Cryptographic proof of the payloads that caused the conflict
+        conflicting_payload_hashes: Vec<[u8; 32]>,
         violated_predicate_id: u32,
         witness_hash: [u8; 32],
     },
@@ -26,6 +28,8 @@ pub fn deterministic_sort(events: &mut [Event]) {
 
 pub fn reconcile_events(mut events: Vec<Event>) -> CheckerResult {
     deterministic_sort(&mut events);
+    
+    let payload_map: BTreeMap<EventId, [u8; 32]> = events.iter().map(|e| (e.event_id, e.payload_hash)).collect();
 
     let mut per_stream = BTreeMap::<(u32, u16), u64>::new();
     let mut known_ids = HashSet::<EventId>::new();
@@ -33,10 +37,13 @@ pub fn reconcile_events(mut events: Vec<Event>) -> CheckerResult {
 
     for e in &events {
         if let Err(_) = e.validate_invariants() {
+            let conflict_hashes = vec![e.payload_hash];
+            crate::replay::dump_crash_state(&events, "obstruction");
             return CheckerResult::Obstruction {
                 conflict_set: vec![e.event_id],
+                conflicting_payload_hashes: conflict_hashes.clone(),
                 violated_predicate_id: 2001,
-                witness_hash: hash_ids(&[e.event_id]),
+                witness_hash: hash_obstruction(&[e.event_id], &conflict_hashes),
             };
         }
 
@@ -47,10 +54,13 @@ pub fn reconcile_events(mut events: Vec<Event>) -> CheckerResult {
         let key = (e.node_id, e.stream_id);
         if let Some(prev) = per_stream.get(&key) {
             if e.lamport <= *prev {
+                let conflict_hashes = vec![e.payload_hash];
+                crate::replay::dump_crash_state(&events, "obstruction");
                 return CheckerResult::Obstruction {
                     conflict_set: vec![e.event_id],
+                    conflicting_payload_hashes: conflict_hashes.clone(),
                     violated_predicate_id: 1001,
-                    witness_hash: hash_ids(&[e.event_id]),
+                    witness_hash: hash_obstruction(&[e.event_id], &conflict_hashes),
                 };
             }
         }
@@ -59,9 +69,17 @@ pub fn reconcile_events(mut events: Vec<Event>) -> CheckerResult {
 
     if !duplicates.is_empty() {
         let set = duplicates.into_iter().collect::<Vec<_>>();
+        let mut hashes = Vec::new();
+        for id in &set {
+            if let Some(h) = payload_map.get(id) {
+                hashes.push(*h);
+            }
+        }
+        crate::replay::dump_crash_state(&events, "obstruction");
         return CheckerResult::Obstruction {
-            witness_hash: hash_ids(&set),
+            witness_hash: hash_obstruction(&set, &hashes),
             conflict_set: set,
+            conflicting_payload_hashes: hashes,
             violated_predicate_id: 1002,
         };
     }
@@ -75,17 +93,26 @@ pub fn reconcile_events(mut events: Vec<Event>) -> CheckerResult {
             if !seen.contains(d) {
                 if batch_ids.contains(d) {
                     // Dependency is in the batch but not yet seen -> Future Dependency / Cycle
+                    let mut hashes = vec![e.payload_hash];
+                    if let Some(h) = payload_map.get(d) {
+                         hashes.push(*h);
+                    }
+                    crate::replay::dump_crash_state(&events, "obstruction");
                     return CheckerResult::Obstruction {
                         conflict_set: vec![e.event_id, *d],
+                        conflicting_payload_hashes: hashes.clone(),
                         violated_predicate_id: 2003,
-                        witness_hash: hash_ids(&[e.event_id, *d]),
+                        witness_hash: hash_obstruction(&[e.event_id, *d], &hashes),
                     };
                 } else {
                     // Dependency is not in the batch -> Missing Dependency
+                    let hashes = vec![e.payload_hash];
+                    crate::replay::dump_crash_state(&events, "obstruction");
                     return CheckerResult::Obstruction {
                         conflict_set: vec![e.event_id, *d],
+                        conflicting_payload_hashes: hashes.clone(),
                         violated_predicate_id: 2002,
-                        witness_hash: hash_ids(&[e.event_id, *d]),
+                        witness_hash: hash_obstruction(&[e.event_id, *d], &hashes),
                     };
                 }
             }
@@ -137,6 +164,7 @@ pub fn into_obstruction(result: &CheckerResult) -> Option<Obstruction> {
             conflict_set,
             violated_predicate_id,
             witness_hash,
+            ..
         } => Some(Obstruction {
             overlap_context_digest: hash_ids(conflict_set),
             conflict_set: conflict_set.clone(),
@@ -158,5 +186,12 @@ pub fn hash_ids(ids: &[EventId]) -> [u8; 32] {
 pub fn hash_bytes(bytes: &[u8]) -> [u8; 32] {
     let mut hasher = Hasher::new();
     hasher.update(bytes);
+    *hasher.finalize().as_bytes()
+}
+
+pub fn hash_obstruction(ids: &[EventId], payloads: &[[u8; 32]]) -> [u8; 32] {
+    let mut hasher = Hasher::new();
+    for id in ids { hasher.update(&id.to_le_bytes()); }
+    for p in payloads { hasher.update(p); }
     *hasher.finalize().as_bytes()
 }

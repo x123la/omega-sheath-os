@@ -12,6 +12,10 @@ fi
 echo "[omega] building rust workspace"
 cargo build --workspace
 
+echo "[omega] building core kernel as WASM blob"
+rustup target add wasm32-unknown-unknown
+cargo build -p omega-core --target wasm32-unknown-unknown --release
+
 echo "[omega] running rust tests"
 cargo test --workspace
 

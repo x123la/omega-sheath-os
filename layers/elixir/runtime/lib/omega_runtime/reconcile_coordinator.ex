@@ -24,7 +24,8 @@ defmodule OmegaRuntime.ReconcileCoordinator do
 
   @impl true
   def handle_cast({:push, envelope}, state) do
-    queue = [envelope | state.queue] |> OmegaRuntime.deterministic_sort()
+    # CHANGE: Just prepend. Do not sort here. O(1) ingestion.
+    queue = [envelope | state.queue]
     next_state = %{state | queue: queue} |> ensure_timer()
 
     if length(queue) >= batch_size() do
@@ -54,7 +55,8 @@ defmodule OmegaRuntime.ReconcileCoordinator do
   defp flush_queue(%{queue: []} = state), do: state
 
   defp flush_queue(state) do
-    batch = state.queue
+    # CHANGE: Sort exactly once per batch. O(N log N) total.
+    batch = state.queue |> OmegaRuntime.deterministic_sort()
     batch_id = state.batch_seq + 1
 
     result =

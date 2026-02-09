@@ -27,6 +27,7 @@ pub struct MergeBody {
 pub struct ObstructionBody {
     pub conflict_set_len: u16,
     pub conflict_set: Vec<u128>,
+    pub conflicting_payload_hashes: Vec<[u8; 32]>,
     pub violated_predicate_id: u32,
     pub witness_hash: [u8; 32],
 }
@@ -123,6 +124,7 @@ pub fn build_certificate(
         }
         CheckerResult::Obstruction {
             conflict_set,
+            conflicting_payload_hashes,
             violated_predicate_id,
             witness_hash,
         } => {
@@ -131,6 +133,7 @@ pub fn build_certificate(
             let body = ObstructionBody {
                 conflict_set_len: c.len() as u16,
                 conflict_set: c.clone(),
+                conflicting_payload_hashes: conflicting_payload_hashes.clone(),
                 violated_predicate_id: *violated_predicate_id,
                 witness_hash: *witness_hash,
             };
