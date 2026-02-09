@@ -14,7 +14,18 @@ pub fn dump_crash_state(events: &[crate::Event], reason: &str) {
 }
 
 pub fn replay_digest(snapshot: &SnapshotManifest, log_suffix: &[u8], replay_seed: u64) -> [u8; 32] {
-    let mut data = serde_json::to_vec(snapshot).unwrap_or_default();
+    // To match Elixir's :erlang.term_to_binary, we'd need a complex encoder.
+    // Instead, we standardize on a simple binary layout: 
+    // [snapshot_fields_le] + [log_suffix] + [replay_seed_le]
+    let mut data = Vec::new();
+    data.extend_from_slice(&snapshot.snapshot_id.to_le_bytes());
+    data.extend_from_slice(&snapshot.created_at_ns.to_le_bytes());
+    data.extend_from_slice(&snapshot.base_checkpoint_offset.to_le_bytes());
+    data.extend_from_slice(&snapshot.frontier_digest);
+    data.extend_from_slice(&snapshot.merged_state_hash);
+    data.extend_from_slice(&snapshot.stream_heads_digest);
+    data.extend_from_slice(&snapshot.schema_hash);
+    
     data.extend_from_slice(log_suffix);
     data.extend_from_slice(&replay_seed.to_le_bytes());
     hash_bytes(&data)

@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #00f2ff;
+  --color-alert: #ff003c;
+}
+
+body {
+  @apply antialiased;
+}

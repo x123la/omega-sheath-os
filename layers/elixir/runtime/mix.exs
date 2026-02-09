@@ -7,7 +7,12 @@ defmodule OmegaRuntime.MixProject do
       version: "0.1.0",
       elixir: "~> 1.16",
       start_permanent: Mix.env() == :prod,
-      deps: []
+      deps: [
+        {:phoenix_pubsub, "~> 2.1"},
+        {:plug_cowboy, "~> 2.0"},
+        {:jason, "~> 1.4"},
+        {:cors_plug, "~> 3.0"}
+      ]
     ]
   end
 

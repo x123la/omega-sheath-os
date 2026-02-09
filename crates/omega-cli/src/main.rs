@@ -215,11 +215,15 @@ fn parse_events(path: &PathBuf) -> Result<Vec<Event>> {
     Ok(out)
 }
 
+use sha2::{Sha256, Digest};
+
 fn compute_schema_hash() -> [u8; 32] {
     let candidates = ["schemas/certificate.schema.json", "../schemas/certificate.schema.json"];
     for path in &candidates {
         if let Ok(bytes) = fs::read(path) {
-            return *blake3::hash(&bytes).as_bytes();
+            let mut hasher = Sha256::new();
+            hasher.update(&bytes);
+            return hasher.finalize().into();
         }
     }
     // Fallback or warning - for now 0s but normally we'd want to fail if schema is missing
@@ -248,6 +252,7 @@ fn cmd_reconcile(
     let checker_input = CheckerInput {
         events,
         prior_frontier_digest: [0; 32],
+        prior_known_ids: std::collections::HashSet::new(),
         binding: binding.clone(),
     };
     let checker_output = run_checker(checker_input);
@@ -461,7 +466,9 @@ fn cmd_bench(events: usize) -> Result<()> {
     let mut generated = Vec::with_capacity(events);
     for i in 0..events {
         let payload = format!("event-{i}").into_bytes();
-        let payload_hash = *blake3::hash(&payload).as_bytes();
+        let mut hasher = Sha256::new();
+        hasher.update(&payload);
+        let payload_hash = hasher.finalize().into();
         generated.push(Event {
             event_id: i as u128 + 1,
             node_id: (i % 32) as u32,
@@ -482,6 +489,7 @@ fn cmd_bench(events: usize) -> Result<()> {
     let result = run_checker(CheckerInput {
         events: generated,
         prior_frontier_digest: [0; 32],
+        prior_known_ids: std::collections::HashSet::new(),
         binding: CheckerBinding {
             checker_version: (0, 1, 0),
             schema_version: 1,
@@ -602,7 +610,9 @@ fn cmd_generate_events(output: PathBuf, count: usize) -> Result<()> {
 
     for i in 0..count.max(2) {
         let payload = format!("event-{i}").into_bytes();
-        let payload_hash = *blake3::hash(&payload).as_bytes();
+        let mut hasher = Sha256::new();
+        hasher.update(&payload);
+        let payload_hash = hasher.finalize().into();
         let deps = if i == 0 { vec![] } else { vec![i as u128] };
 
         generated.push(Event {

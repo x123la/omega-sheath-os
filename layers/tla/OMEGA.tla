@@ -1,10 +1,10 @@
 --------------------------- MODULE OMEGA ---------------------------
 EXTENDS Naturals, Sequences, FiniteSets, TLC
 
-CONSTANT Nodes, Events, MaxCertLen, Deps
+CONSTANT Nodes, Events, MaxCertLen, Deps, QuorumSize
 
-VARIABLES Queues, Seen, Accepted, Frontier, CertStream, ActorState
-Vars == <<Queues, Seen, Accepted, Frontier, CertStream, ActorState>>
+VARIABLES Queues, Seen, Accepted, Frontier, CertStream, ActorState, Votes
+Vars == <<Queues, Seen, Accepted, Frontier, CertStream, ActorState, Votes>>
 
 Init ==
   /\ Queues = [n \in Nodes |-> <<>>]
@@ -13,39 +13,27 @@ Init ==
   /\ Frontier = {}
   /\ CertStream = <<>>
   /\ ActorState = "Running"
-
-Receive(e) ==
-  /\ e \in Events
-  /\ e \notin Seen
-  /\ Seen' = Seen \cup {e}
-  /\ UNCHANGED <<Queues, Accepted, Frontier, CertStream, ActorState>>
+  /\ Votes = [c \in 1..MaxCertLen |-> {}]
 
 Reconcile ==
   /\ ActorState = "Running"
   /\ Len(CertStream) < MaxCertLen
   /\ Accepted' = Seen
   /\ Frontier' = Seen
-  /\ CertStream' = Append(CertStream, [type |-> "Merge", accepted |-> Seen])
-  /\ UNCHANGED <<Queues, Seen, ActorState>>
+  /\ CertStream' = Append(CertStream, [type |-> "Merge", accepted |-> Seen, final |-> FALSE])
+  /\ UNCHANGED <<Queues, Seen, ActorState, Votes>>
 
-Compatible(e, a) == TRUE
+Vote(certIdx, node) ==
+  /\ certIdx \in 1..Len(CertStream)
+  /\ node \in Nodes
+  /\ Votes' = [Votes EXCEPT ![certIdx] = Votes[certIdx] \cup {node}]
+  /\ UNCHANGED <<Queues, Seen, Accepted, Frontier, CertStream, ActorState>>
 
-EmitObstruction ==
-  /\ ActorState = "Running"
-  /\ Len(CertStream) < MaxCertLen
-  (* NEW: Guard clause. Only obstruct if a conflict ACTUALLY exists *)
-  /\ \E e \in Seen: \E a \in Accepted: e.eventId = a.eventId \/ ~Compatible(e, a)
-  /\ CertStream' = Append(CertStream, [type |-> "Obstruction", accepted |-> Accepted])
-  /\ UNCHANGED <<Queues, Seen, Accepted, Frontier, ActorState>>
-
-Crash ==
-  /\ ActorState' = "SafeMode"
-  /\ UNCHANGED <<Queues, Seen, Accepted, Frontier, CertStream>>
-
-Restart ==
-  /\ ActorState = "SafeMode"
-  /\ ActorState' = "Running"
-  /\ UNCHANGED <<Queues, Seen, Accepted, Frontier, CertStream>>
+Finalize(certIdx) ==
+  /\ certIdx \in 1..Len(CertStream)
+  /\ Cardinality(Votes[certIdx]) >= QuorumSize
+  /\ CertStream' = [CertStream EXCEPT ![certIdx].final = TRUE]
+  /\ UNCHANGED <<Queues, Seen, Accepted, Frontier, ActorState, Votes>>
 
 Next ==
   \/ \E e \in Events: Receive(e)
@@ -53,6 +41,11 @@ Next ==
   \/ EmitObstruction
   \/ Crash
   \/ Restart
+  \/ \E i \in 1..Len(CertStream), n \in Nodes: Vote(i, n)
+  \/ \E i \in 1..Len(CertStream): Finalize(i)
+
+BFT_Safety == \A i \in 1..Len(CertStream): 
+  CertStream[i].final => Cardinality(Votes[i]) >= QuorumSize
 
 NoDuplicateAcceptance == \A e \in Accepted: Cardinality({e}) = 1
 

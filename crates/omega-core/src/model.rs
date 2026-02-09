@@ -1,4 +1,4 @@
-use blake3::Hasher;
+use sha2::{Sha256, Digest};
 use serde::{Deserialize, Serialize};
 
 pub type NodeId = u32;
@@ -32,9 +32,9 @@ impl Event {
         if self.payload.len() != self.payload_len as usize {
             return Err("payload_len mismatch".into());
         }
-        let mut hasher = Hasher::new();
+        let mut hasher = Sha256::new();
         hasher.update(&self.payload);
-        let digest = *hasher.finalize().as_bytes();
+        let digest: [u8; 32] = hasher.finalize().into();
         if digest != self.payload_hash {
             return Err("payload_hash mismatch".into());
         }

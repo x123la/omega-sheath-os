@@ -44,7 +44,8 @@ defmodule OmegaRuntime.SequencerActor do
         deps = normalize_deps(envelope.deps)
 
         if Enum.all?(deps, &MapSet.member?(state.seen, &1)) do
-          push_to_reconcile(envelope)
+          push_to_reconcile(envelope, state.seen)
+          broadcast(%{type: "sequencer_accepted", event_id: envelope.event_id})
 
           next = %{
             state
@@ -54,11 +55,16 @@ defmodule OmegaRuntime.SequencerActor do
 
           {:accepted, next}
         else
+          broadcast(%{type: "sequencer_pending", event_id: envelope.event_id})
           next_pending = Map.put(state.pending, envelope.event_id, envelope)
           {:pending, %{state | pending: next_pending}}
         end
       end
     end
+  end
+
+  defp broadcast(payload) do
+    Phoenix.PubSub.broadcast(OmegaRuntime.PubSub, "TruthEvents", {:broadcast, payload})
   end
 
   defp release_ready(state) do
@@ -79,8 +85,8 @@ defmodule OmegaRuntime.SequencerActor do
     end)
   end
 
-  defp push_to_reconcile(envelope) do
-    OmegaRuntime.ReconcileCoordinator.push(envelope)
+  defp push_to_reconcile(envelope, seen) do
+    OmegaRuntime.ReconcileCoordinator.push(envelope, seen)
     OmegaRuntime.MetricsActor.emit("sequencer.accepted", 1, %{event_id: envelope.event_id})
   end
 

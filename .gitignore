@@ -14,3 +14,7 @@
 *.log
 .DS_Store
 omega.key
+/ui/node_modules
+/ui/dist
+/layers/elixir/runtime/priv/static
+/layers/elixir/runtime/mix.lock

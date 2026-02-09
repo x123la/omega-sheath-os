@@ -22,13 +22,18 @@ defmodule OmegaRuntime.ReplayActor do
     if observed == expected_hash do
       {:reply, :ok, state}
     else
+      incident_id = :binary.decode_unsigned(:crypto.strong_rand_bytes(16))
+      
+      # Match Rust: hash of (expected_hash + observed_hash) as binary
+      metadata_digest = OmegaRuntime.digest(expected_hash <> observed)
+
       incident = %{
-        incident_id: :binary.decode_unsigned(:crypto.strong_rand_bytes(16)),
+        incident_id: incident_id,
         expected_hash: expected_hash,
         observed_hash: observed,
         divergence_batch_id: 0,
         divergence_event_id: 0,
-        metadata_digest: OmegaRuntime.digest(:erlang.term_to_binary({expected_hash, observed}))
+        metadata_digest: metadata_digest
       }
 
       dir = System.get_env("OMEGA_REPLAY_DIR", "/tmp/omega-runtime/replay")
@@ -40,7 +45,19 @@ defmodule OmegaRuntime.ReplayActor do
     end
   end
 
-  defp replay_digest(snapshot_manifest, log_suffix, replay_seed) do
-    OmegaRuntime.digest(:erlang.term_to_binary({snapshot_manifest, log_suffix, replay_seed}))
+  defp replay_digest(s, log_suffix, replay_seed) do
+    # Match Rust: snapshot fields in LE + suffix + seed in LE
+    data = 
+      <<s.snapshot_id::little-size(64)>> <>
+      <<s.created_at_ns::little-size(64)>> <>
+      <<s.base_checkpoint_offset::little-size(64)>> <>
+      s.frontier_digest <>
+      s.merged_state_hash <>
+      s.stream_heads_digest <>
+      s.schema_hash <>
+      log_suffix <>
+      <<replay_seed::little-size(64)>>
+
+    OmegaRuntime.digest(data)
   end
 end

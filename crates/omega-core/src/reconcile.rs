@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-use blake3::Hasher;
+use sha2::{Sha256, Digest};
 use serde::{Deserialize, Serialize};
 
 use crate::{Event, EventId, GlobalMerge, Obstruction};
@@ -26,13 +26,13 @@ pub fn deterministic_sort(events: &mut [Event]) {
     events.sort_by_key(|e| e.ordering_key());
 }
 
-pub fn reconcile_events(mut events: Vec<Event>) -> CheckerResult {
+pub fn reconcile_events(mut events: Vec<Event>, previously_known: &HashSet<EventId>) -> CheckerResult {
     deterministic_sort(&mut events);
     
     let payload_map: BTreeMap<EventId, [u8; 32]> = events.iter().map(|e| (e.event_id, e.payload_hash)).collect();
 
     let mut per_stream = BTreeMap::<(u32, u16), u64>::new();
-    let mut known_ids = HashSet::<EventId>::new();
+    let mut known_ids = previously_known.clone();
     let mut duplicates = BTreeSet::<EventId>::new();
 
     for e in &events {
@@ -86,7 +86,7 @@ pub fn reconcile_events(mut events: Vec<Event>) -> CheckerResult {
 
     let all_ids = events.iter().map(|e| e.event_id).collect::<Vec<_>>();
     let batch_ids = all_ids.iter().copied().collect::<HashSet<_>>();
-    let mut seen = HashSet::new();
+    let mut seen = previously_known.clone();
 
     for e in &events {
         for d in &e.deps {
@@ -105,7 +105,7 @@ pub fn reconcile_events(mut events: Vec<Event>) -> CheckerResult {
                         witness_hash: hash_obstruction(&[e.event_id, *d], &hashes),
                     };
                 } else {
-                    // Dependency is not in the batch -> Missing Dependency
+                    // Dependency is not in the batch AND not previously known -> Missing Dependency
                     let hashes = vec![e.payload_hash];
                     crate::replay::dump_crash_state(&events, "obstruction");
                     return CheckerResult::Obstruction {
@@ -120,15 +120,15 @@ pub fn reconcile_events(mut events: Vec<Event>) -> CheckerResult {
         seen.insert(e.event_id);
     }
 
-    let mut state_hasher = Hasher::new();
+    let mut state_hasher = Sha256::new();
     for e in &events {
         state_hasher.update(&e.payload_hash);
         state_hasher.update(&e.event_id.to_le_bytes());
     }
-    let merged_state_hash = *state_hasher.finalize().as_bytes();
+    let merged_state_hash: [u8; 32] = state_hasher.finalize().into();
 
-    let accepted_ids_digest = hash_ids(&all_ids);
-    let witness_hash = hash_bytes(&[&merged_state_hash[..], &accepted_ids_digest[..]].concat());
+    let accepted_ids_digest: [u8; 32] = hash_ids(&all_ids);
+    let witness_hash: [u8; 32] = hash_bytes(&[&merged_state_hash[..], &accepted_ids_digest[..]].concat());
 
     CheckerResult::Merge {
         merged_state_hash,
@@ -176,22 +176,22 @@ pub fn into_obstruction(result: &CheckerResult) -> Option<Obstruction> {
 }
 
 pub fn hash_ids(ids: &[EventId]) -> [u8; 32] {
-    let mut hasher = Hasher::new();
+    let mut hasher = Sha256::new();
     for id in ids {
         hasher.update(&id.to_le_bytes());
     }
-    *hasher.finalize().as_bytes()
+    hasher.finalize().into()
 }
 
 pub fn hash_bytes(bytes: &[u8]) -> [u8; 32] {
-    let mut hasher = Hasher::new();
+    let mut hasher = Sha256::new();
     hasher.update(bytes);
-    *hasher.finalize().as_bytes()
+    hasher.finalize().into()
 }
 
 pub fn hash_obstruction(ids: &[EventId], payloads: &[[u8; 32]]) -> [u8; 32] {
-    let mut hasher = Hasher::new();
+    let mut hasher = Sha256::new();
     for id in ids { hasher.update(&id.to_le_bytes()); }
     for p in payloads { hasher.update(p); }
-    *hasher.finalize().as_bytes()
+    hasher.finalize().into()
 }

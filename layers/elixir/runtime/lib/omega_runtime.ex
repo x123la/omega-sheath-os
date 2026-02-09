@@ -48,6 +48,9 @@ defmodule OmegaRuntime do
     text
     |> String.replace("\\", "\\\\")
     |> String.replace("\"", "\\\"")
+    |> String.replace("/", "\\/")
+    |> String.replace("\b", "\\b")
+    |> String.replace("\f", "\\f")
     |> String.replace("\n", "\\n")
     |> String.replace("\r", "\\r")
     |> String.replace("\t", "\\t")

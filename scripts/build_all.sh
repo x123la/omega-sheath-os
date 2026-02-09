@@ -64,6 +64,13 @@ else
   if [[ "$STRICT" -eq 1 ]]; then exit 1; fi
 fi
 
+if command -v npm >/dev/null 2>&1; then
+  echo "[omega] building command center ui"
+  (cd ui && npm install && npm run build)
+  mkdir -p layers/elixir/runtime/priv/static
+  cp -r ui/dist/* layers/elixir/runtime/priv/static/
+fi
+
 if [[ "$RUN_TLC" -eq 1 || "$STRICT" -eq 1 ]]; then
   if command -v tlc >/dev/null 2>&1; then
     echo "[omega] model checking tla+ spec with tlc"

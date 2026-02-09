@@ -24,10 +24,10 @@ defmodule OmegaRuntime.SnapshotActor do
       snapshot_id: next_id,
       created_at_ns: OmegaRuntime.now_ns(),
       base_checkpoint_offset: 0,
-      frontier_digest: to_digest(frontier),
-      merged_state_hash: to_digest(merged),
-      stream_heads_digest: to_digest(heads),
-      schema_hash: to_digest(schema)
+      frontier_digest: frontier,
+      merged_state_hash: merged,
+      stream_heads_digest: heads,
+      schema_hash: schema
     }
 
     path = Path.join(dir, "snapshot-#{next_id}.bin")
@@ -35,7 +35,4 @@ defmodule OmegaRuntime.SnapshotActor do
 
     {:reply, {:ok, manifest, path}, %{state | snapshot_id: next_id}}
   end
-
-  defp to_digest(v) when is_binary(v), do: OmegaRuntime.digest(v)
-  defp to_digest(v), do: OmegaRuntime.digest(:erlang.term_to_binary(v))
 end

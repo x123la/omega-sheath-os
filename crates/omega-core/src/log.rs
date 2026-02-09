@@ -1,7 +1,76 @@
+use std::fs::File;
+use memmap2::Mmap;
 use crc32fast::Hasher as CrcHasher;
 use serde::{Deserialize, Serialize};
 
 pub const OMEGA_MAGIC: [u8; 8] = [b'O', b'M', b'E', b'G', b'A', 0, 1, 0];
+
+/// A zero-copy view into an OMEGA log file using memory mapping.
+pub struct OmegaLogView {
+    mmap: Mmap,
+    header: OmegaFileHeader,
+}
+
+impl OmegaLogView {
+    pub fn open(file: &File) -> anyhow::Result<Self> {
+        let mmap = unsafe { Mmap::map(file)? };
+        if mmap.len() < 64 {
+            anyhow::bail!("log file too small for header");
+        }
+        let header = OmegaFileHeader::decode(&mmap[0..64])
+            .map_err(|e| anyhow::anyhow!("header error: {e}"))?;
+        
+        Ok(Self { mmap, header })
+    }
+
+    pub fn header(&self) -> &OmegaFileHeader {
+        &self.header
+    }
+
+    /// Returns a zero-copy iterator over valid frames in the log.
+    pub fn iter_frames(&self) -> FrameIterator<'_> {
+        FrameIterator {
+            data: &self.mmap[64..],
+            off: 0,
+        }
+    }
+}
+
+pub struct FrameIterator<'a> {
+    data: &'a [u8],
+    off: usize,
+}
+
+impl<'a> Iterator for FrameIterator<'a> {
+    type Item = &'a [u8]; // Returns the raw payload slice (zero-copy)
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.off + 12 > self.data.len() {
+            return None;
+        }
+        let len = u32::from_le_bytes(self.data[self.off..self.off+4].try_into().unwrap()) as usize;
+        if len < 12 || self.off + len > self.data.len() {
+            return None;
+        }
+
+        let crc = u32::from_le_bytes(self.data[self.off+4..self.off+8].try_into().unwrap());
+        let frame_type = u16::from_le_bytes(self.data[self.off+8..self.off+10].try_into().unwrap());
+        let res = u16::from_le_bytes(self.data[self.off+10..self.off+12].try_into().unwrap());
+        let payload = &self.data[self.off+12..self.off+len];
+
+        // Validation (Still necessary, but doesn't copy the payload)
+        let mut h = CrcHasher::new();
+        h.update(&frame_type.to_le_bytes());
+        h.update(&res.to_le_bytes());
+        h.update(payload);
+        if h.finalize() != crc {
+            return None;
+        }
+
+        self.off += len;
+        Some(payload)
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OmegaFileHeader {

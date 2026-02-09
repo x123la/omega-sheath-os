@@ -42,16 +42,18 @@ pub struct CertificateEnvelope {
     pub batch_id: u64,
     pub created_at_ns: u64,
     pub issuer_key_id: [u8; 16],
-    pub body: serde_json::Value,
+    // NEW: Rigid binary body instead of dynamic JSON
+    pub body_bytes: Vec<u8>,
     pub body_hash: [u8; 32],
     pub signature: Vec<u8>,
     pub prev_cert_hash: [u8; 32],
+    // NEW: BFT Quorum Signatures (Placeholder for perfect consensus)
+    pub quorum_signatures: Vec<Vec<u8>>,
 }
 
 impl CertificateEnvelope {
-    pub fn verify(&self, key: &VerifyingKey) -> anyhow::Result<()> {
-        let body_bytes = serde_json::to_vec(&self.body)?;
-        let calc_body_hash = hash_bytes(&body_bytes);
+    pub fn verify(&self, key: &VerifyingKey, quorum_keys: &[VerifyingKey], quorum_size: usize) -> anyhow::Result<()> {
+        let calc_body_hash = hash_bytes(&self.body_bytes);
         if calc_body_hash != self.body_hash {
             anyhow::bail!("body hash mismatch");
         }
@@ -63,7 +65,24 @@ impl CertificateEnvelope {
             .map_err(|_| anyhow::anyhow!("signature length must be 64"))?;
         let sig = ed25519_dalek::Signature::from_bytes(&sig_bytes);
         key.verify(&msg, &sig)
-            .with_context(|| "signature verification failed")?;
+            .with_context(|| "issuer signature verification failed")?;
+
+        // BFT Quorum Check
+        if quorum_size > 0 {
+            let mut valid_votes = 0;
+            for (i, q_sig_bytes) in self.quorum_signatures.iter().enumerate() {
+                if i >= quorum_keys.len() { break; }
+                let q_sig = ed25519_dalek::Signature::from_bytes(
+                    q_sig_bytes.as_slice().try_into().map_err(|_| anyhow::anyhow!("bad quorum sig"))?
+                );
+                if quorum_keys[i].verify(&msg, &q_sig).is_ok() {
+                    valid_votes += 1;
+                }
+            }
+            if valid_votes < quorum_size {
+                anyhow::bail!("BFT failure: quorum size {} not reached (valid votes: {})", quorum_size, valid_votes);
+            }
+        }
         Ok(())
     }
 }
@@ -83,7 +102,7 @@ pub fn issuer_key_id(verifying_key: &VerifyingKey) -> [u8; 16] {
 }
 
 pub fn cert_hash(envelope: &CertificateEnvelope) -> anyhow::Result<[u8; 32]> {
-    let bytes = serde_json::to_vec(envelope)?;
+    let bytes = envelope_message(envelope)?;
     Ok(hash_bytes(&bytes))
 }
 
@@ -99,28 +118,24 @@ pub fn build_certificate(
     let verifying = issuer_key.verifying_key();
     let key_id = issuer_key_id(&verifying);
 
-    let mut cert_id_rng = StdRng::seed_from_u64(batch_id ^ replay_seed.rotate_left(13));
+    let mut cert_id_rng = rand::rngs::StdRng::seed_from_u64(batch_id ^ replay_seed.rotate_left(13));
     let cert_id = cert_id_rng.next_u64() as u128 | ((cert_id_rng.next_u64() as u128) << 64);
 
-    let (cert_type, body_json, trace_root_hash) = match result {
+    let (cert_type, body_bytes, trace_root_hash) = match result {
         CheckerResult::Merge {
             merged_state_hash,
             accepted_event_ids,
             witness_hash,
             ..
         } => {
-            let body = MergeBody {
-                merged_state_hash: *merged_state_hash,
-                frontier_digest: hash_ids(accepted_event_ids),
-                accepted_count: accepted_event_ids.len() as u32,
-                witness_hash: *witness_hash,
-                replay_seed,
-            };
-            (
-                CertType::Merge,
-                serde_json::to_value(body)?,
-                hash_ids(accepted_event_ids),
-            )
+            let mut buf = Vec::new();
+            buf.extend_from_slice(merged_state_hash);
+            let frontier_digest = hash_ids(accepted_event_ids);
+            buf.extend_from_slice(&frontier_digest);
+            buf.extend_from_slice(&(accepted_event_ids.len() as u32).to_le_bytes());
+            buf.extend_from_slice(witness_hash);
+            buf.extend_from_slice(&replay_seed.to_le_bytes());
+            (CertType::Merge, buf, frontier_digest)
         }
         CheckerResult::Obstruction {
             conflict_set,
@@ -130,22 +145,17 @@ pub fn build_certificate(
         } => {
             let mut c = conflict_set.clone();
             c.sort_unstable();
-            let body = ObstructionBody {
-                conflict_set_len: c.len() as u16,
-                conflict_set: c.clone(),
-                conflicting_payload_hashes: conflicting_payload_hashes.clone(),
-                violated_predicate_id: *violated_predicate_id,
-                witness_hash: *witness_hash,
-            };
-            (
-                CertType::Obstruction,
-                serde_json::to_value(body)?,
-                hash_ids(&c),
-            )
+            let mut buf = Vec::new();
+            buf.extend_from_slice(&(c.len() as u32).to_le_bytes());
+            for id in &c { buf.extend_from_slice(&id.to_le_bytes()); }
+            buf.extend_from_slice(&(conflicting_payload_hashes.len() as u32).to_le_bytes());
+            for h in conflicting_payload_hashes { buf.extend_from_slice(h); }
+            buf.extend_from_slice(&violated_predicate_id.to_le_bytes());
+            buf.extend_from_slice(witness_hash);
+            (CertType::Obstruction, buf, hash_ids(&c))
         }
     };
 
-    let body_bytes = serde_json::to_vec(&body_json)?;
     let body_hash = hash_bytes(&body_bytes);
 
     let mut env = CertificateEnvelope {
@@ -160,10 +170,11 @@ pub fn build_certificate(
             .unwrap_or_default()
             .as_nanos() as u64,
         issuer_key_id: key_id,
-        body: body_json,
+        body_bytes,
         body_hash,
         signature: vec![0; 64],
         prev_cert_hash,
+        quorum_signatures: Vec::new(),
     };
 
     let msg = envelope_message(&env)?;
@@ -172,18 +183,18 @@ pub fn build_certificate(
 }
 
 fn envelope_message(env: &CertificateEnvelope) -> anyhow::Result<Vec<u8>> {
-    let tuple = (
-        env.cert_id,
-        &env.cert_type,
-        env.trace_root_hash,
-        env.checker_version,
-        env.schema_version,
-        env.batch_id,
-        env.created_at_ns,
-        env.issuer_key_id,
-        &env.body,
-        env.body_hash,
-        env.prev_cert_hash,
-    );
-    Ok(serde_json::to_vec(&tuple)?)
+    let mut data = Vec::new();
+    data.extend_from_slice(&env.cert_id.to_le_bytes());
+    data.extend_from_slice(&(env.cert_type.clone() as u8).to_le_bytes());
+    data.extend_from_slice(&env.trace_root_hash);
+    data.extend_from_slice(&env.checker_version.0.to_le_bytes());
+    data.extend_from_slice(&env.checker_version.1.to_le_bytes());
+    data.extend_from_slice(&env.checker_version.2.to_le_bytes());
+    data.extend_from_slice(&env.schema_version.to_le_bytes());
+    data.extend_from_slice(&env.batch_id.to_le_bytes());
+    data.extend_from_slice(&env.created_at_ns.to_le_bytes());
+    data.extend_from_slice(&env.issuer_key_id);
+    data.extend_from_slice(&env.body_hash);
+    data.extend_from_slice(&env.prev_cert_hash);
+    Ok(data)
 }

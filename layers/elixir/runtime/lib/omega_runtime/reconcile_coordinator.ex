@@ -6,11 +6,11 @@ defmodule OmegaRuntime.ReconcileCoordinator do
   @default_flush_ms 100
 
   def start_link(_opts) do
-    state = %{queue: [], timer_ref: nil, batch_seq: 0, safe_mode: false}
+    state = %{queue: [], timer_ref: nil, batch_seq: 0, safe_mode: false, prior_known_ids: MapSet.new()}
     GenServer.start_link(__MODULE__, state, name: __MODULE__)
   end
 
-  def push(event_envelope), do: GenServer.cast(__MODULE__, {:push, event_envelope})
+  def push(event_envelope, seen_ids), do: GenServer.cast(__MODULE__, {:push, event_envelope, seen_ids})
   def flush, do: GenServer.cast(__MODULE__, :flush)
   def set_safe_mode(enabled), do: GenServer.cast(__MODULE__, {:safe_mode, enabled})
 
@@ -23,10 +23,10 @@ defmodule OmegaRuntime.ReconcileCoordinator do
   end
 
   @impl true
-  def handle_cast({:push, envelope}, state) do
+  def handle_cast({:push, envelope, seen_ids}, state) do
     # CHANGE: Just prepend. Do not sort here. O(1) ingestion.
     queue = [envelope | state.queue]
-    next_state = %{state | queue: queue} |> ensure_timer()
+    next_state = %{state | queue: queue, prior_known_ids: seen_ids} |> ensure_timer()
 
     if length(queue) >= batch_size() do
       {:noreply, flush_queue(%{next_state | timer_ref: nil})}
@@ -63,6 +63,7 @@ defmodule OmegaRuntime.ReconcileCoordinator do
       OmegaRuntime.CheckerGateway.check(%{
         batch_id: batch_id,
         events: batch,
+        prior_known_ids: state.prior_known_ids,
         checker_version: {0, 1, 0},
         schema_version: 1
       })

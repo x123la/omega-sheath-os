@@ -1,7 +1,12 @@
+use std::collections::HashSet;
+use sha2::{Sha256, Digest};
 use omega_core::{run_checker, validate_binding, CheckerBinding, CheckerInput, Event};
 
 fn event(id: u128, lamport: u64, deps: Vec<u128>) -> Event {
     let payload = format!("evt-{id}").into_bytes();
+    let mut hasher = Sha256::new();
+    hasher.update(&payload);
+    let payload_hash = hasher.finalize().into();
     Event {
         event_id: id,
         node_id: 1,
@@ -12,7 +17,7 @@ fn event(id: u128, lamport: u64, deps: Vec<u128>) -> Event {
         flags: 0,
         deps_count: deps.len() as u16,
         payload_len: payload.len() as u32,
-        payload_hash: *blake3::hash(&payload).as_bytes(),
+        payload_hash,
         deps,
         payload,
     }
@@ -30,6 +35,7 @@ fn checker_preserves_binding() {
     let output = run_checker(CheckerInput {
         events: vec![event(1, 1, vec![])],
         prior_frontier_digest: [0; 32],
+        prior_known_ids: HashSet::new(),
         binding: binding.clone(),
     });
 

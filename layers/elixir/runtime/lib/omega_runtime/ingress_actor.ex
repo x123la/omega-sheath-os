@@ -16,6 +16,7 @@ defmodule OmegaRuntime.IngressActor do
     case normalize(envelope) do
       {:ok, ev} ->
         OmegaRuntime.MetricsActor.emit("ingress.events", 1, %{event_id: ev.event_id})
+        broadcast(%{type: "ingress", event: ev})
         OmegaRuntime.SequencerActor.enqueue(ev)
 
       {:error, reason} ->
@@ -25,12 +26,21 @@ defmodule OmegaRuntime.IngressActor do
     {:noreply, state}
   end
 
+  defp broadcast(payload) do
+    Phoenix.PubSub.broadcast(OmegaRuntime.PubSub, "TruthEvents", {:broadcast, payload})
+  end
+
   defp normalize(envelope) when is_map(envelope) do
     ev =
       envelope
       |> Enum.into(%{}, fn {k, v} -> {normalize_key(k), v} end)
       |> Map.put_new(:deps, [])
       |> Map.put_new(:payload, <<>>)
+
+    # Ensure payload-related fields are correct and consistent with Rust core
+    payload = ev.payload
+    ev = Map.put(ev, :payload_len, byte_size(payload))
+    ev = Map.put(ev, :payload_hash, OmegaRuntime.digest(payload))
 
     with :ok <- require_fields(ev),
          :ok <- require_integer(ev.event_id, :event_id),

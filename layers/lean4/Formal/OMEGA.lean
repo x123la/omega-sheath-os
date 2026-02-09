@@ -22,19 +22,22 @@ inductive CheckerResult where
   | obstruction (conflictSet : List Nat) (predicateId : Nat)
   deriving Repr
 
-lemma ordering_key_fst_le {t1 t2 : Nat × Nat × Nat × Nat} (h : t1 <= t2) : t1.1 <= t2.1 := by
-   -- Lexicographical order definition on tuples implies first element is <=
-   sorry
+theorem ordering_key_fst_le {t1 t2 : Nat × Nat × Nat × Nat} (h : t1 <= t2) : t1.1 <= t2.1 := by
+  -- Lexicographical order on Nat tuples means if t1 <= t2, then t1.1 <= t2.1 or (t1.1 = t2.1 and ...)
+  match t1, t2 with
+  | (a1, b1, c1, d1), (a2, b2, c2, d2) =>
+    exact (Prod.Lex.le_iff.1 h).left
 
 -- The True Theorem: If events are sorted by OrderingKey, time never moves backward.
 theorem sorted_implies_lamport_monotonic
   (events : List Event)
   (sorted : List.Sorted (fun a b => OrderingKey a <= OrderingKey b) events) :
-  ∀ a b, List.Mem a events → List.Mem b events → List.indexOf a events < List.indexOf b events →
+  ∀ a b, a ∈ events → b ∈ events → List.indexOf a events < List.indexOf b events →
   a.lamport <= b.lamport := by
   intro a b ha hb h_idx
-  -- Because the list is sorted, a appearing before b implies their keys are ordered.
-  have h_ord : OrderingKey a <= OrderingKey b := by sorry
-  apply ordering_key_fst_le h_ord
+  -- Get the keys from the sorted list property
+  have h_le := List.Sorted.rel_of_indexOf_le sorted (Nat.le_of_lt h_idx)
+  -- Apply the lemma that lexicographical comparison of keys preserves lamport order
+  apply ordering_key_fst_le h_le
 
 end OMEGA
