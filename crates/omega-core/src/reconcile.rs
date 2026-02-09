@@ -67,17 +67,30 @@ pub fn reconcile_events(mut events: Vec<Event>) -> CheckerResult {
     }
 
     let all_ids = events.iter().map(|e| e.event_id).collect::<Vec<_>>();
-    let known = all_ids.iter().copied().collect::<HashSet<_>>();
+    let batch_ids = all_ids.iter().copied().collect::<HashSet<_>>();
+    let mut seen = HashSet::new();
+
     for e in &events {
         for d in &e.deps {
-            if !known.contains(d) {
-                return CheckerResult::Obstruction {
-                    conflict_set: vec![e.event_id, *d],
-                    violated_predicate_id: 2002,
-                    witness_hash: hash_ids(&[e.event_id, *d]),
-                };
+            if !seen.contains(d) {
+                if batch_ids.contains(d) {
+                    // Dependency is in the batch but not yet seen -> Future Dependency / Cycle
+                    return CheckerResult::Obstruction {
+                        conflict_set: vec![e.event_id, *d],
+                        violated_predicate_id: 2003,
+                        witness_hash: hash_ids(&[e.event_id, *d]),
+                    };
+                } else {
+                    // Dependency is not in the batch -> Missing Dependency
+                    return CheckerResult::Obstruction {
+                        conflict_set: vec![e.event_id, *d],
+                        violated_predicate_id: 2002,
+                        witness_hash: hash_ids(&[e.event_id, *d]),
+                    };
+                }
             }
         }
+        seen.insert(e.event_id);
     }
 
     let mut state_hasher = Hasher::new();

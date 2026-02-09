@@ -48,7 +48,7 @@ if command -v mix >/dev/null 2>&1 && command -v elixir >/dev/null 2>&1; then
     echo "[omega] elixir runtime checks failed in this environment"
     if command -v elixirc >/dev/null 2>&1; then
       echo "[omega] attempting socketless elixirc fallback check"
-      if ! (cd layers/elixir/runtime && tmpdir=\"$(mktemp -d /tmp/omega-elixirc.XXXXXX)\" && elixirc -o \"$tmpdir\" lib/omega_runtime.ex lib/omega_runtime/*.ex); then
+      if ! (cd layers/elixir/runtime && tmpdir="$(mktemp -d /tmp/omega-elixirc.XXXXXX)" && elixirc -o "$tmpdir" lib/omega_runtime.ex lib/omega_runtime/*.ex); then
         if [[ "$STRICT" -eq 1 ]]; then exit 1; fi
       fi
     elif [[ "$STRICT" -eq 1 ]]; then

@@ -92,10 +92,10 @@ pub fn build_certificate(
     checker_version: (u16, u16, u16),
     schema_version: u16,
     replay_seed: u64,
+    issuer_key: &SigningKey,
     prev_cert_hash: [u8; 32],
 ) -> anyhow::Result<CertificateEnvelope> {
-    let signing = derive_signing_key(replay_seed ^ batch_id);
-    let verifying = signing.verifying_key();
+    let verifying = issuer_key.verifying_key();
     let key_id = issuer_key_id(&verifying);
 
     let mut cert_id_rng = StdRng::seed_from_u64(batch_id ^ replay_seed.rotate_left(13));
@@ -164,7 +164,7 @@ pub fn build_certificate(
     };
 
     let msg = envelope_message(&env)?;
-    env.signature = signing.sign(&msg).to_bytes().to_vec();
+    env.signature = issuer_key.sign(&msg).to_bytes().to_vec();
     Ok(env)
 }
 

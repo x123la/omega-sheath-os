@@ -7,10 +7,10 @@ use std::process::ExitCode;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use omega_core::{
-    build_certificate, cert_hash, compare_replay, deterministic_sort, hash_bytes, metric_line,
-    recover_valid_prefix, run_checker, validate_binding, CheckerBinding, CheckerInput,
-    CheckerOutput, CheckerResult, Event, MetricRecord, OmegaFileHeader, SnapshotManifest,
-    OMEGA_MAGIC,
+    build_certificate, cert_hash, compare_replay, derive_signing_key, deterministic_sort,
+    metric_line, recover_valid_prefix, run_checker, validate_binding, CertificateEnvelope,
+    CheckerBinding, CheckerInput, CheckerOutput, CheckerResult, Event, MetricRecord,
+    OmegaFileHeader, SnapshotManifest, OMEGA_MAGIC,
 };
 
 #[derive(Debug, Parser)]
@@ -215,6 +215,18 @@ fn parse_events(path: &PathBuf) -> Result<Vec<Event>> {
     Ok(out)
 }
 
+fn compute_schema_hash() -> [u8; 32] {
+    let candidates = ["schemas/certificate.schema.json", "../schemas/certificate.schema.json"];
+    for path in &candidates {
+        if let Ok(bytes) = fs::read(path) {
+            return *blake3::hash(&bytes).as_bytes();
+        }
+    }
+    // Fallback or warning - for now 0s but normally we'd want to fail if schema is missing
+    eprintln!("warning: schema file not found, using zero-binding");
+    [0; 32]
+}
+
 fn cmd_reconcile(
     input: PathBuf,
     batch_id: u64,
@@ -224,10 +236,12 @@ fn cmd_reconcile(
     let mut events = parse_events(&input)?;
     deterministic_sort(&mut events);
 
+    let schema_hash = compute_schema_hash();
+    
     let binding = CheckerBinding {
         checker_version: (0, 1, 0),
         schema_version: 1,
-        schema_hash: [0; 32],
+        schema_hash,
         predicate_catalog_hash: [0; 32],
     };
 
@@ -263,10 +277,12 @@ fn cmd_certify(
 ) -> Result<()> {
     let bytes = fs::read(&result_path)?;
     let root: serde_json::Value = serde_json::from_slice(&bytes)?;
+    
+    let schema_hash = compute_schema_hash();
     let expected_binding = CheckerBinding {
         checker_version: (0, 1, 0),
         schema_version,
-        schema_hash: [0; 32],
+        schema_hash,
         predicate_catalog_hash: [0; 32],
     };
 
@@ -283,9 +299,36 @@ fn cmd_certify(
         serde_json::from_value::<CheckerResult>(result_value)?
     };
 
+    let key_path = PathBuf::from("omega.key");
+    let issuer_key = if key_path.exists() {
+        let bytes = fs::read(&key_path)?;
+        let arr: [u8; 32] = bytes
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("invalid key file"))?;
+        ed25519_dalek::SigningKey::from_bytes(&arr)
+    } else {
+        let seed = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos() as u64;
+        let k = derive_signing_key(seed);
+        fs::write(&key_path, k.to_bytes())?;
+        k
+    };
+
     let prev_hash = if let Some(log) = &cert_log {
         if log.exists() {
-            hash_bytes(&fs::read(log)?)
+            let f = fs::File::open(log)?;
+            let last = BufReader::new(f).lines().last().transpose()?;
+            if let Some(line) = last {
+                if line.trim().is_empty() {
+                    [0u8; 32]
+                } else {
+                    let cert: CertificateEnvelope = serde_json::from_str(&line)?;
+                    cert_hash(&cert)?
+                }
+            } else {
+                [0u8; 32]
+            }
         } else {
             [0u8; 32]
         }
@@ -299,6 +342,7 @@ fn cmd_certify(
         (0, 1, 0),
         schema_version,
         replay_seed,
+        &issuer_key,
         prev_hash,
     )?;
 

@@ -392,6 +392,7 @@ dependencies = [
  "anyhow",
  "blake3",
  "clap",
+ "ed25519-dalek",
  "hex",
  "omega-core",
  "serde",

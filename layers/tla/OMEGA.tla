@@ -1,7 +1,7 @@
 --------------------------- MODULE OMEGA ---------------------------
 EXTENDS Naturals, Sequences, FiniteSets, TLC
 
-CONSTANT Nodes, Events, MaxCertLen
+CONSTANT Nodes, Events, MaxCertLen, Deps
 
 VARIABLES Queues, Seen, Accepted, Frontier, CertStream, ActorState
 Vars == <<Queues, Seen, Accepted, Frontier, CertStream, ActorState>>
@@ -52,7 +52,9 @@ Next ==
 
 NoDuplicateAcceptance == \A e \in Accepted: Cardinality({e}) = 1
 
-Safety == NoDuplicateAcceptance
+CausalOrder == \A e \in Accepted: \A d \in Deps[e]: d \in Accepted
+
+Safety == NoDuplicateAcceptance /\ CausalOrder
 
 Liveness == <> (ActorState = "Running")
 

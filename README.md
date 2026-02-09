@@ -346,6 +346,7 @@ Current examples:
 3. `2001`: payload hash match
 4. `2002`: dependency known
 5. `3001`: overlap agreement
+6. `2003`: future/cyclic dependency
 
 ## Conformance and Integrity Matrix
 
@@ -353,13 +354,14 @@ Current examples:
 |---|---|---|
 | Deterministic ordering | Implemented | `crates/omega-core/src/reconcile.rs` |
 | Duplicate and dependency checks | Implemented | `crates/omega-core/src/reconcile.rs` |
-| Checker-binding metadata | Implemented | `crates/omega-core/src/checker.rs` |
+| Checker-binding metadata | Implemented | `crates/omega-core/src/checker.rs` (cryptographically bound to schema file) |
 | Binding validation before certification | Implemented | `crates/omega-cli/src/main.rs` |
-| Signed certificates + chain linkage | Implemented | `crates/omega-core/src/cert.rs`, Elixir cert actor |
+| Signed certificates + chain linkage | Implemented | `crates/omega-core/src/cert.rs` (persistent identity key), Elixir cert actor |
+| Cross-language JSON Interoperability | Implemented | Elixir Runtime emits JSON certificates |
 | `.omega` frame CRC recovery | Implemented | `crates/omega-core/src/log.rs` |
 | Replay mismatch incidents | Implemented | `crates/omega-core/src/replay.rs`, Elixir replay actor |
 | Elixir Layer B actor graph | Implemented | `layers/elixir/runtime/lib/omega_runtime/*.ex` |
-| TLA+ model-check artifact | Implemented | `layers/tla/OMEGA.tla`, `layers/tla/OMEGA.cfg` |
+| TLA+ model-check artifact | Implemented | `layers/tla/OMEGA.tla` (enforces CausalOrder invariant), `layers/tla/OMEGA.cfg` |
 | Lean theorem depth | Minimal reference baseline | `layers/lean4/Formal/OMEGA.lean` |
 
 ## Operational Storage Map

@@ -87,20 +87,37 @@ defmodule OmegaRuntime.CheckerGateway do
   end
 
   defp check_dependency_presence(events) do
-    known = MapSet.new(Enum.map(events, & &1.event_id))
+    batch_ids = MapSet.new(Enum.map(events, & &1.event_id))
 
-    Enum.reduce_while(events, :ok, fn e, _acc ->
+    Enum.reduce_while(events, MapSet.new(), fn e, seen ->
       deps = if is_list(e.deps), do: e.deps, else: []
 
-      case Enum.find(deps, fn d -> not MapSet.member?(known, d) end) do
+      case Enum.find(deps, fn d -> not MapSet.member?(seen, d) end) do
         nil ->
-          {:cont, :ok}
+          {:cont, MapSet.put(seen, e.event_id)}
 
-        missing ->
-          {:halt,
-           {:obstruction, %{conflict_set: [e.event_id, missing], violated_predicate_id: 2002}}}
+        missing_or_future ->
+          if MapSet.member?(batch_ids, missing_or_future) do
+            {:halt,
+             {:obstruction,
+              %{
+                conflict_set: [e.event_id, missing_or_future],
+                violated_predicate_id: 2003
+              }}}
+          else
+            {:halt,
+             {:obstruction,
+              %{
+                conflict_set: [e.event_id, missing_or_future],
+                violated_predicate_id: 2002
+              }}}
+          end
       end
     end)
+    |> case do
+      %MapSet{} -> :ok
+      other -> other
+    end
   end
 
   defp obstruction(conflict_set, predicate_id) do
