@@ -1,4 +1,9 @@
-# OMEGA-SHEAF-OS: Technical Specification & Architectural Manifesto
+# 🫀 OMEGA-SHEAF-OS
+
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Built with Rust](https://img.shields.io/badge/Built%20with-Rust-orange.svg)](https://www.rust-lang.org/)
+[![Verification: Lean 4](https://img.shields.io/badge/Verification-Lean%204-purple.svg)](https://lean-lang.org/)
+[![Runtime: Elixir/OTP](https://img.shields.io/badge/Runtime-Elixir%2FOTP-634482.svg)](https://elixir-lang.org/)
 
 **A High-Integrity Distributed Consistency Kernel with Multi-Layer Formal Verification.**
 
@@ -6,10 +11,21 @@ OMEGA-SHEAF-OS is a "Truth Engine" designed to convert non-deterministic distrib
 
 ---
 
+## 🚀 Key Features
+
+- **Formal Verification**: Logic proven in Lean 4 and TLA+ model checking.
+- **Deterministic Reconciliation**: Arrival-time independent state construction via a 224-bit Canonical Ordering Key.
+- **Zero-Copy Systems Layer**: High-performance I/O using `mmap` and Zig boundaries.
+- **BFT Quorum Consensus**: Synchronous certificate finalization via Elixir/OTP.
+- **Architecture-Agnostic Analytics**: Fixed-point arithmetic in Futhark for bit-for-bit identity across hardware (Intel vs. ARM).
+- **OC2 Command Center**: High-density D3.js visualization of the "Causal Sheaf Map".
+
+---
+
 ## 🏛 Deep Architecture Map
 
-### 1. Verification Mind Map (The Logical Gauntlet)
-The system ensures that data survives a "Gauntlet of Truth" before being finalized.
+### 1. The Logical Gauntlet (Mind Map)
+The system ensures that data survives a multi-layered verification process before being finalized.
 
 ```mermaid
 mindmap
@@ -39,12 +55,8 @@ mindmap
       Merkle Audit Scroll
 ```
 
----
-
-## 🔄 Lifecycle of a Causal Event
-
-### 1. Data Flow & Verification Pipeline
-This flowchart illustrates the transition from a raw binary frame to a BFT-finalized certificate.
+### 2. The Verification Pipeline (Flowchart)
+How a raw log frame becomes a finalized certificate of truth.
 
 ```mermaid
 flowchart TD
@@ -59,36 +71,12 @@ flowchart TD
     G -->|Telemetry| I[OC2 Dashboard]
 ```
 
-### 2. Sequence of Consensus
-Detailed interactions between the local runtime and the distributed quorum.
-
-```mermaid
-sequenceDiagram
-    participant OS as Linux Kernel (mmap)
-    participant Zig as Zig Systems Layer
-    participant Rust as Rust Kernel
-    participant Elixir as Elixir Runtime
-    participant Cluster as Quorum Peers
-    participant UI as OC2 Dashboard
-
-    OS->>Zig: Map .omega file to address space
-    Zig->>Rust: Pass pointer to Frame header (Zero-copy)
-    Rust->>Rust: Deterministic Sort (Ordering Key)
-    Rust->>Rust: Invariant Check (Monotonicity/Deps)
-    Rust->>Elixir: Emit CheckerResult (Merge/Obstruction)
-    Elixir->>Elixir: Sign with Local Ed25519 Key
-    Elixir->>Cluster: Broadcast Vote (Certificate + Signature)
-    Cluster-->>Elixir: Return Quorum Signatures
-    Elixir->>Elixir: Finalize Hash Chain (prev_cert_hash)
-    Elixir->>UI: Stream Truth Event (PubSub)
-```
-
 ---
 
 ## 📐 Mathematical & Logical Foundations
 
-### 1. The Canonical Ordering Key
-To ensure arrival-time independence, every event is sorted by a 224-bit key before reconciliation. This ensures that any two nodes in the universe, given the same set of events, will reach the **exact same state hash**.
+### 1. The Canonical Ordering Key (224-bit)
+To ensure arrival-time independence, every event is sorted by a 224-bit key. This ensures that any two nodes in the universe, given the same set of events, will reach the **exact same state hash**.
 
 ```mermaid
 graph LR
@@ -104,72 +92,83 @@ graph LR
 $$K = (Lamport_{64} \ll 160) | (NodeID_{32} \ll 128) | (StreamID_{16} \ll 112) | (EventID_{112})$$
 
 ### 2. Formal Monotonicity (Lean 4)
-In `layers/lean4/Formal/OMEGA.lean`, we formally prove that for any list of events $L$, if $L$ is sorted by $K$, then for any two events $a, b \in L$ where $a$ precedes $b$, $a.lamport \le b.lamport$. This establishing the "Arrow of Time" as a mathematical constant.
+In `layers/lean4/Formal/OMEGA.lean`, we formally prove that for any list of events $L$, if $L$ is sorted by $K$, then for any two events $a, b \in L$ where $a$ precedes $b$, $a.lamport \le b.lamport$. This establishes the "Arrow of Time" as a mathematical constant.
 
 ### 3. Fixed-Point Analytics (Futhark)
-To prevent non-determinism caused by CPU-specific floating-point rounding (Intel vs ARM), all analytics utilize **Fixed-Point Arithmetic**. Values are stored as `i32` with a $10^{3}$ scaling factor. 
-*   **Result**: 100% bit-for-bit identity across disparate hardware architectures.
+To prevent non-determinism caused by CPU-specific floating-point rounding, all analytics utilize **Fixed-Point Arithmetic**. Values are stored as `i32` with a $10^{3}$ scaling factor, ensuring 100% bit-for-bit identity across disparate hardware architectures.
 
 ---
 
-## 📦 Technical Implementation Details
+## 🛠 Toolchain & Installation
 
-### 1. Zero-Copy `mmap` Strategy
-Traditional I/O copies data from the disk to the kernel, then to the application buffer. OMEGA uses the `mmap` syscall in both Zig and Rust:
-*   The `.omega` file is mapped directly into the CPU's virtual address space.
-*   The `OmegaLogView` struct treats the disk as a raw `&[u8]` slice.
-*   **Performance**: Zero CPU cycles spent on copying; throughput is limited only by the NVMe/Memory bus.
+### Requirements
+- **Rust**: `1.75+` (Toolchain: `wasm32-unknown-unknown`)
+- **Elixir**: `1.16+` (Erlang/OTP 26+)
+- **Zig**: `0.13.0`
+- **Lean**: `Lean 4` (via `elan`)
+- **Futhark**: `0.25+`
+- **Node.js**: `20+` (For OC2 Dashboard)
 
-### 2. Rigid Binary Contracts
-We have eliminated JSON for internal certification. The `CertificateEnvelope` is a packed binary structure:
+### Installation (Ubuntu/Debian)
+```bash
+# Install core dependencies
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+sudo apt install elixir zig-compiler nodejs npm
 
-```mermaid
-classDiagram
-    class CertificateEnvelope {
-        +u128 cert_id
-        +u8 cert_type
-        +u8[32] trace_root_hash
-        +u64 batch_id
-        +u8[32] body_hash
-        +u8[32] prev_cert_hash
-    }
+# Install Lean 4
+curl https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -sSf | sh
+
+# Clone and setup
+git clone https://github.com/your-org/omega-sheaf-os.git
+cd omega-sheaf-os
+./scripts/build_all.sh
 ```
 
-| Field | Type | Bits |
-|---|---|---|
-| `cert_id` | u128 | 128 |
-| `cert_type` | u8 | 8 |
-| `trace_root_hash` | [u8; 32] | 256 |
-| `batch_id` | u64 | 64 |
-| `body_hash` | [u8; 32] | 256 |
-| `prev_cert_hash` | [u8; 32] | 256 |
+---
 
-### 3. BFT Quorum Consensus
-The Elixir layer implements a synchronous quorum collector:
-*   **Node Identity**: Managed by persistent Ed25519 keys (`omega.key`).
-*   **Quorum Threshold**: Requires $N$ signatures for a cluster of size $N$.
-*   **Finalization**: A certificate is only committed to `cert.log` once the `quorum_signatures` array is populated and verified.
+## 📦 Project Structure
+
+```text
+.
+├── crates/             # Rust Workspace
+│   ├── omega-core/     # Reconciliation & Invariants
+│   └── omega-cli/      # Command-line Interface
+├── layers/             # Specialized Logic Layers
+│   ├── elixir/         # Distributed Runtime & Quorum
+│   ├── lean4/          # Formal Mathematical Proofs
+│   ├── zig/            # Systems I/O (mmap)
+│   ├── futhark/        # GPU-Accelerated Analytics
+│   └── tla/            # Temporal Logic Specification
+├── ui/                 # OC2 Dashboard (React/D3.js)
+├── schemas/            # Binary Contract Definitions
+└── scripts/            # Build & Deployment Tools
+```
 
 ---
 
-## 🛠 Command Reference & Toolchain
+## 🕹 Quick Start & CLI Reference
 
-### CLI Commands
-| Command | Flag | Description |
-|---|---|---|
-| `ingest` | `--input` | Maps a log and validates CRC32 frame boundaries. |
-| `reconcile` | `--batch-id` | Assembles a deterministic state from event sets. |
-| `certify` | `--output` | Produces a signed, binary-packed truth certificate. |
-| `explain` | `--input` | Decodes binary certificates into readable telemetry. |
-| `doctor` | `--root` | Validates the 6-layer toolchain availability. |
+### Ingesting & Certifying a Log
+```bash
+# 1. Ingest raw log and validate CRC32
+omega ingest --input logs/sample.omega
 
-### Toolchain Requirements
-*   **Rust**: `1.75+` (Workspace, edition 2021)
-*   **Elixir**: `1.16+` (Erlang/OTP 26+)
-*   **Zig**: `0.13.0` (Standard library only)
-*   **Lean**: `Lean 4` (via `elan`)
-*   **Futhark**: `0.25+`
-*   **Node.js**: `20+` (For OC2 Dashboard)
+# 2. Reconcile events into a deterministic state
+omega reconcile --input logs/events.json --output results.json
+
+# 3. Produce a signed BFT certificate
+omega certify --result results.json --output cert.bin --cert-log chain.log
+```
+
+### CLI Commands Reference
+| Command | Description |
+|---|---|
+| `ingest` | Maps a log and validates CRC32 frame boundaries. |
+| `reconcile` | Assembles a deterministic state from event sets. |
+| `certify` | Produces a signed, binary-packed truth certificate. |
+| `replay` | Validates deterministic replay from a snapshot + log. |
+| `explain` | Decodes binary certificates into readable telemetry. |
+| `doctor` | Validates the 6-layer toolchain availability. |
 
 ---
 
@@ -177,25 +176,16 @@ The Elixir layer implements a synchronous quorum collector:
 
 The OMEGA Command Center (OC2) is a high-density observability platform.
 
-### Key Visual Interpreters
-1.  **Causal Sheaf Map**: A real-time D3 force-directed graph. 
-    *   **Nodes**: Represent Events and Certificates.
-    *   **Edges**: Represent Causal Dependencies (`deps[]`).
-    *   **Alerts**: Conflicting nodes (Obstructions) flash in Alert-Red (#ff003c).
-2.  **Quorum Monitor**: Visualizes the "Signature Gathering" phase of the BFT consensus.
-3.  **Merkle Audit Scroll**: A horizontal timeline of the `prev_cert_hash` chain, allowing for "Point-in-Time" integrity audits.
+1.  **Causal Sheaf Map**: Force-directed graph of event dependencies.
+2.  **Quorum Monitor**: Real-time BFT signature gathering.
+3.  **Merkle Audit Scroll**: Timeline of the `prev_cert_hash` chain.
 
-### Deployment
+### Launch OC2
 ```bash
-# 1. Full Build (Rust, Zig, Lean, Elixir, UI)
-./scripts/build_all.sh
-
-# 2. Launch Background Cluster
+# Build and start the cluster + UI
 ./scripts/start_command_center.sh
 
-# 3. Access Truth Platform
-# UI: http://localhost:4000
-# API: http://localhost:4000/api/status
+# Access via Browser: http://localhost:4000
 ```
 
 ---
