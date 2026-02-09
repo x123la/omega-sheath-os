@@ -1,72 +1,125 @@
 # OMEGA-SHEAF-OS
 
-**State-of-the-Art Distributed Consistency Kernel & Truth Platform.**
-
-OMEGA-SHEAF-OS is a high-integrity, formal-methods-backed distributed system designed to make consistency a chain of enforceable contracts. It integrates six layers of verification into a single, high-performance deterministic pipeline.
-
-## 🏛 The World-Class Architecture
-
-### 1. Hexagonal Verification Stack
-The system is governed by a multi-layer logical gauntlet:
-*   **Layer A (Lean 4)**: Mathematical proof of Lamport Monotonicity.
-*   **Layer B (Elixir/OTP)**: Fault-tolerant actor runtime with BFT-ready quorum consensus.
-*   **Layer C (Zig)**: Low-level systems boundary with zero-copy memory-mapped I/O.
-*   **Layer D (Futhark)**: Data-parallel analytics using hardware-agnostic fixed-point arithmetic.
-*   **Layer E (TLA+)**: Formal protocol model checking for safety and liveness invariants.
-*   **Layer F (Nushell/React)**: High-fidelity orchestration and the **OC2 Command Center**.
-
-### 2. Perfect Determinism
-*   **Hardware Agnostic**: Replaced floating-point math with fixed-point `i32` logic, ensuring bit-for-bit identical results across Intel, ARM, and RISC-V architectures.
-*   **Causal Integrity**: Enforces strict ordering using a canonical key `(lamport, node_id, stream_id, event_id)` ensuring arrival-time independence.
-
-### 3. Cryptographic Rigor
-*   **Rigid Binary Contracts**: Standardized on a strictly packed binary envelope for all certificates, eliminating the fragility of string-based serialization.
-*   **BFT Quorum Finalization**: Moves beyond passive detection to active consensus, requiring a majority of Ed25519 signatures before a state is finalized.
-
-### 4. Zero-Copy Performance
-*   Uses `mmap` (memory mapping) in both Rust and Zig to map the `.omega` log directly into the CPU's address space, processing data at the speed of the hardware memory bus.
+Formal Distributed Consistency Kernel with Multi-Layer Verification and Real-Time Causal Visualization.
 
 ---
 
-## 🖥 OMEGA Command Center (OC2)
+## 🗺 System Architecture
 
-Transform raw cryptographic truth into actionable intelligence with our Palantir-grade dashboard.
-
-*   **Causal Sheaf Map**: Real-time D3.js visualization of the "Mental Map" of event dependencies.
-*   **BFT Quorum Monitor**: Visual tracking of signature collection and finalization progress.
-*   **Audit Scroll**: Merkle-chain explorer for inspecting the immutable lineage of verified certificates.
-
-### Launch the Platform
-```bash
-# 1. Build the full stack
-./scripts/build_all.sh
-
-# 2. Start the Command Center
-./scripts/start_command_center.sh
-
-# 3. Access the UI
-# Open http://localhost:4000
+### Multi-Layer Verification Mind Map
+```mermaid
+mindmap
+  root((OMEGA Kernel))
+    Formal Semantics
+      Lean 4 Proofs
+      Lamport Monotonicity
+    Protocol Safety
+      TLA+ Model Checking
+      Invariant Validation
+    System Implementation
+      Rust Core
+      Zero-Copy mmap I/O
+      SHA-256 / Ed25519
+    Actor Runtime
+      Elixir OTP
+      BFT Quorum Consensus
+      Phoenix PubSub
+    Analytics
+      Futhark Kernels
+      Fixed-Point Arithmetic
+    Observability
+      OC2 Command Center
+      D3.js Causal Graph
 ```
+
+### Logical Data Flow
+```mermaid
+graph LR
+    Input[.omega Log] -->|mmap| Zig[Zig Boundary]
+    Zig -->|Frames| Rust[Rust Kernel]
+    Rust -->|Deterministic Sort| Reconcile[Reconciliation]
+    Reconcile -->|Certificate| Elixir[Elixir Runtime]
+    Elixir -->|Broadcast| Quorum[BFT Quorum]
+    Quorum -->|Finalize| UI[OC2 Dashboard]
+```
+
+---
+
+## 📦 Dependency Matrix
+
+| Layer | Toolchain | Primary Dependencies |
+|---|---|---|
+| **A: Formal** | `Lean 4` / `elan` | `std` |
+| **B: Runtime** | `Elixir 1.16+` / `OTP 26+` | `phoenix_pubsub`, `plug_cowboy`, `jason`, `cors_plug` |
+| **C: Systems** | `Zig 0.13.0` | `std.posix` |
+| **D: Analytics**| `Futhark` | `std` |
+| **E: Model** | `TLA+` / `TLC` | `Java 21+` |
+| **F: Kernel** | `Rust 1.75+` | `memmap2`, `sha2`, `ed25519-dalek`, `serde`, `uuid` |
+| **G: UI** | `Node.js` / `npm` | `React 19`, `D3.js`, `Tailwind CSS`, `lucide-react` |
 
 ---
 
 ## 🛠 Command Reference (`omega` CLI)
 
-| Command | Purpose |
-|---|---|
-| `omega ingest` | Validates `.omega` log integrity using zero-copy prefix recovery. |
-| `omega reconcile` | Performs deterministic reconciliation with cross-batch dependency tracking. |
-| `omega certify` | Generates signed binary envelopes with hash-chain linkage. |
-| `omega explain` | Deconstructs and visualizes binary certificate data. |
-| `omega doctor` | Comprehensive environment and toolchain health check. |
+All CLI operations utilize memory-mapped I/O for zero-copy performance.
 
-## 📊 Technical Specifications
-*   **Hash Algorithm**: SHA-256 (Standardized across all layers).
-*   **Signature Scheme**: Ed25519 (Deterministic identity).
-*   **Data Model**: Canonical Ordering Key + Causal Deps + Payload Hash.
-*   **Consensus**: N/N Quorum (Configurable for BFT thresholds).
+### `omega ingest`
+Validates binary frame integrity and recovers the last valid prefix.
+```bash
+omega ingest --input logs/sample.omega
+```
 
-## ⚖️ Mission Statement
-OMEGA-SHEAF-OS exists to make distributed consistency a chain of enforceable contracts, not a convention. It provides the "Source of Truth" for systems where the cost of a consistency error is catastrophic.
+### `omega reconcile`
+Assembles events into a deterministic batch based on the canonical ordering key.
+```bash
+omega reconcile --input events.json --batch-id 1 --prior-frontier frontier.bin
+```
+
+### `omega certify`
+Generates a strictly packed binary envelope signed with Ed25519.
+```bash
+omega certify --result reconcile.json --batch-id 1 --output cert.bin
+```
+
+### `omega explain`
+Deconstructs binary certificates into human-readable JSON metadata.
+```bash
+omega explain --input cert.bin
+```
+
+---
+
+## 🖥 OMEGA Command Center (OC2)
+
+The OC2 platform provides real-time observability into the distributed consensus state.
+
+### Quickstart
+1. **Initialize and Build**:
+   ```bash
+   ./scripts/build_all.sh
+   ```
+2. **Launch Services**:
+   ```bash
+   ./scripts/start_command_center.sh
+   ```
+3. **Endpoint**: `http://localhost:4000`
+
+### Visual Interpreters
+* **Causal Sheaf**: Graph rendering of the `EventId -> Deps[]` relationship.
+* **Quorum Status**: Real-time signature collection metrics per certificate.
+* **Chain Audit**: Merkle-lineage verification via `prev_cert_hash`.
+
+---
+
+## 📊 Logic Specifications
+
+### Canonical Ordering Key
+Determined by `(lamport, node_id, stream_id, event_id)`. This ensures that state convergence is independent of network arrival order.
+
+### Integrity Contracts
+* **Hashing**: SHA-256 packed binary.
+* **Signatures**: Ed25519 signatures over rigid binary envelopes.
+* **Consensus**: $(n+1)/2$ Quorum requirement for certificate finalization.
+* **Arithmetic**: Fixed-point `i32` (1000x scale) for cross-platform analytics determinism.
 
 **License**: Apache-2.0
